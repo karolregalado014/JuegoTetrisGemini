@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberTetris O&M Edition</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #050505;
+            --panel-color: #111;
+            --neon-cyan: #00f3ff;
+            --neon-pink: #ff00ff;
+            --neon-yellow: #f3f315;
+            --text-glow: 0 0 10px rgba(0, 243, 255, 0.7);
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: #fff;
+            font-family: 'Orbitron', sans-serif;
+            overflow-x: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .game-container {
+            border: 2px solid var(--neon-cyan);
+            box-shadow: 0 0 20px var(--neon-cyan), inset 0 0 10px var(--neon-cyan);
+            background: #000;
+            position: relative;
+        }
+
+        canvas {
+            display: block;
+            background-image: linear-gradient(rgba(0, 243, 255, 0.05) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(0, 243, 255, 0.05) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+
+        .hud-panel {
+            background: var(--panel-color);
+            border-left: 2px solid var(--neon-pink);
+            padding: 20px;
+            min-width: 200px;
+        }
+
+        .neon-text {
+            color: #fff;
+            text-shadow: var(--text-glow);
+            text-transform: uppercase;
+        }
+
+        .btn-cyber {
+            background: transparent;
+            color: var(--neon-cyan);
+            border: 1px solid var(--neon-cyan);
+            text-shadow: var(--text-glow);
+            transition: 0.3s;
+            font-size: 0.8rem;
+        }
+
+        .btn-cyber:hover {
+            background: var(--neon-cyan);
+            color: #000;
+            box-shadow: 0 0 15px var(--neon-cyan);
+        }
+
+        .controls-hint {
+            font-size: 0.7rem;
+            color: #888;
+        }
+
+        /* Mobile Controls */
+        .touch-controls {
+            display: none;
+        }
+
+        @media (max-width: 992px) {
+            .touch-controls {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 10px;
+                margin-top: 20px;
+            }
+            .hud-panel {
+                border-left: none;
+                border-top: 2px solid var(--neon-pink);
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container-fluid py-4">
+    <div class="row justify-content-center g-0">
+        <div class="col-auto">
+            <div class="game-container">
+                <canvas id="tetris" width="300" height="600"></canvas>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-3 hud-panel d-flex flex-column justify-content-between">
+            <div>
+                <h2 class="neon-text mb-4"><i class="fas fa-microchip"></i> CYBER TETRIS</h2>
+                
+                <div class="mb-3">
+                    <small class="text-muted">PUNTUACIÓN</small>
+                    <div id="score" class="h3 neon-text">0</div>
+                </div>
+
+                <div class="mb-3">
+                    <small class="text-muted">TIEMPO</small>
+                    <div id="timer" class="h3 text-warning">02:00</div>
+                </div>
+
+                <hr class="border-secondary">
+
+                <div class="settings mb-4">
+                    <label class="form-label small text-muted">VELOCIDAD</label>
+                    <select id="difficulty" class="form-select form-select-sm bg-dark text-white border-secondary mb-2">
+                        <option value="1000">Novato (Lento)</option>
+                        <option value="600" selected>Hacker (Normal)</option>
+                        <option value="200">Cyborg (Rápido)</option>
+                    </select>
+
+                    <label class="form-label small text-muted">PALETA</label>
+                    <select id="palette" class="form-select form-select-sm bg-dark text-white border-secondary">
+                        <option value="neon">Neón Clásico</option>
+                        <option value="retro">GameBoy Retro</option>
+                        <option value="acid">Ácido Volt</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="d-grid gap-2">
+                <button id="start-btn" class="btn btn-cyber py-3">INICIAR SESIÓN</button>
+                <div class="controls-hint mt-3 d-none d-lg-block">
+                    <p><i class="fas fa-keyboard"></i> Flechas: Mover</p>
+                    <p><i class="fas fa-sync"></i> Z / X: Rotar</p>
+                    <p><i class="fas fa-arrow-down"></i> Espacio: Drop</p>
+                    <p><i class="fas fa-mouse"></i> Click: Rotar | Arrastrar: Mover</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="touch-controls px-2">
+        <button class="btn btn-cyber" id="touch-left"><i class="fas fa-arrow-left"></i></button>
+        <button class="btn btn-cyber" id="touch-rotate"><i class="fas fa-sync"></i></button>
+        <button class="btn btn-cyber" id="touch-right"><i class="fas fa-arrow-right"></i></button>
+        <button class="btn btn-cyber w-100" id="touch-drop">CAÍDA RÁPIDA (SPACE)</button>
+    </div>
+</div>
+
+<script>
+/** * LÓGICA DEL JUEGO - JAVASCRIPT PURO 
+ */
+const canvas = document.getElementById('tetris');
+const context = canvas.getContext('2d');
+const scoreElement = document.getElementById('score');
+const timerElement = document.getElementById('timer');
+const difficultySelect = document.getElementById('difficulty');
+const paletteSelect = document.getElementById('palette');
+
+context.scale(30, 30); // Cada bloque es de 30x30
+
+// Definición de Piezas (Matrices)
+function createPiece(type) {
+    if (type === 'I') return [,,,];
+    if (type === 'L') return [,,];
+    if (type === 'J') return [,,];
+    if (type === 'O') return [,];
+    if (type === 'Z') return [,,];
+    if (type === 'S') return [,,];
+    if (type === 'T') return [,,];
+    if (type === 'R') return [,]; // Rectángulo extra pedido
+}
+
+// Colores por Paleta
+const colors = {
+    neon: [null, '#00f3ff', '#ff00ff', '#f3f315', '#00ff00', '#ff0055', '#9d00ff', '#ffffff', '#ff8800'],
+    retro: [null, '#8bac0f', '#8bac0f', '#8bac0f', '#8bac0f', '#8bac0f', '#8bac0f', '#8bac0f', '#8bac0f'],
+    acid: [null, '#ccff00', '#00ffcc', '#ff00ff', '#ffffff', '#333333', '#000000', '#00eeff', '#55ff00']
+};
+
+function draw() {
+    // Fondo
+    context.fillStyle = '#000';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    drawMatrix(arena, {x: 0, y: 0});
+    drawMatrix(player.matrix, player.pos);
+}
+
+function drawMatrix(matrix, offset) {
+    const currentPalette = paletteSelect.value;
+    matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+            if (value !== 0) {
+                // Sombra de neón
+                context.shadowBlur = 10;
+                context.shadowColor = colors[currentPalette][value];
+                context.fillStyle = colors[currentPalette][value];
+                context.fillRect(x + offset.x, y + offset.y, 1, 1);
+                // Borde del bloque
+                context.shadowBlur = 0;
+                context.strokeStyle = 'rgba(0,0,0,0.5)';
+                context.lineWidth = 0.05;
+                context.strokeRect(x + offset.x, y + offset.y, 1, 1);
+            }
+        });
+    });
+}
+
+// Lógica de colisión
+function arenaSweep() {
+    let rowCount = 1;
+    outer: for (let y = arena.length - 1; y > 0; --y) {
+        for (let x = 0; x < arena[y].length; ++x) {
+            if (arena[y][x] === 0) {
+                continue outer;
+            }
+        }
+        const row = arena.splice(y, 1).fill(0);
+        arena.unshift(row);
+        ++y;
+        player.score += rowCount * 100;
+        rowCount *= 2;
+    }
+    updateScore();
+}
+
+function collide(arena, player) {
+    const [m, o] = [player.matrix, player.pos];
+    for (let y = 0; y < m.length; ++y) {
+        for (let x = 0; x < m[y].length; ++x) {
+            if (m[y][x] !== 0 && (arena[y + o.y] && arena[y + o.y][x + o.x]) !== 0) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+function createArena(w, h) {
+    const matrix = [];
+    while (h--) matrix.push(new Array(w).fill(0));
+    return matrix;
+}
+
+function merge(arena, player) {
+    player.matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+            if (value !== 0) {
+                arena[y + player.pos.y][x + player.pos.x] = value;
+            }
+        });
+    });
+}
+
+function playerDrop() {
+    player.pos.y++;
+    if (collide(arena, player)) {
+        player.pos.y--;
+        merge(arena, player);
+        playerReset();
+        arenaSweep();
+        updateScore();
+    }
+    dropCounter = 0;
+}
+
+function playerMove(dir) {
+    player.pos.x += dir;
+    if (collide(arena, player)) {
+        player.pos.x -= dir;
+    }
+}
+
+function playerReset() {
+    const pieces = 'ILJOTSZR';
+    player.matrix = createPiece(pieces[pieces.length * Math.random() | 0]);
+    player.pos.y = 0;
+    player.pos.x = (arena.length / 2 | 0) - (player.matrix.length / 2 | 0);
+    if (collide(arena, player)) {
+        arena.forEach(row => row.fill(0));
+        player.score = 0;
+        updateScore();
+    }
+}
+
+function playerRotate(dir) {
+    const pos = player.pos.x;
+    let offset = 1;
+    rotate(player.matrix, dir);
+    while (collide(arena, player)) {
+        player.pos.x += offset;
+        offset = -(offset + (offset > 0 ? 1 : -1));
+        if (offset > player.matrix.length) {
+            rotate(player.matrix, -dir);
+            player.pos.x = pos;
+            return;
+        }
+    }
+}
+
+function rotate(matrix, dir) {
+    for (let y = 0; y < matrix.length; ++y) {
+        for (let x = 0; x < y; ++x) {
+            [matrix[x][y], matrix[y][x]] = [matrix[y][x], matrix[x][y]];
+        }
+    }
+    if (dir > 0) matrix.forEach(row => row.reverse());
+    else matrix.reverse();
+}
+
+let dropCounter = 0;
+let lastTime = 0;
+let arena = createArena(10, 20);
+
+const player = {
+    pos: {x: 0, y: 0},
+    matrix: null,
+    score: 0,
+};
+
+function update(time = 0) {
+    if (!gameRunning) return;
+    const deltaTime = time - lastTime;
+    lastTime = time;
+
+    dropCounter += deltaTime;
+    if (dropCounter > parseInt(difficultySelect.value)) {
+        playerDrop();
+    }
+
+    draw();
+    requestAnimationFrame(update);
+}
+
+function updateScore() {
+    scoreElement.innerText = player.score;
+}
+
+// Temporizador
+let gameTime = 120; // 2 minutos
+let gameRunning = false;
+let timerInterval;
+
+function startTimer() {
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+        if (!gameRunning) return;
+        gameTime--;
+        let mins = Math.floor(gameTime / 60);
+        let secs = gameTime % 60;
+        timerElement.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        
+        if (gameTime <= 0) {
+            gameRunning = false;
+            alert("TIEMPO AGOTADO. SCORE FINAL: " + player.score);
+            location.reload();
+        }
+    }, 1000);
+}
+
+// Controles de Teclado
+document.addEventListener('keydown', event => {
+    if (event.keyCode === 37) playerMove(-1); // Izquierda
+    else if (event.keyCode === 39) playerMove(1); // Derecha
+    else if (event.keyCode === 40) playerDrop(); // Abajo
+    else if (event.keyCode === 90) playerRotate(-1); // Z
+    else if (event.keyCode === 88) playerRotate(1); // X
+    else if (event.keyCode === 32) { // Espacio (Caída rápida)
+        while(!collide(arena, player)) { player.pos.y++; }
+        player.pos.y--;
+        playerDrop();
+    }
+});
+
+// Controles de Mouse
+let isDragging = false;
+let startX = 0;
+
+canvas.addEventListener('mousedown', e => {
+    isDragging = true;
+    startX = e.clientX;
+});
+
+window.addEventListener('mouseup', e => {
+    if (isDragging && Math.abs(e.clientX - startX) < 5) {
+        playerRotate(1); // Click para rotar
+    }
+    isDragging = false;
+});
+
+canvas.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    const diff = e.clientX - startX;
+    if (Math.abs(diff) > 30) {
+        playerMove(diff > 0 ? 1 : -1);
+        startX = e.clientX;
+    }
+});
+
+// Controles Táctiles UI
+document.getElementById('touch-left').onclick = () => playerMove(-1);
+document.getElementById('touch-right').onclick = () => playerMove(1);
+document.getElementById('touch-rotate').onclick = () => playerRotate(1);
+document.getElementById('touch-drop').onclick = () => {
+    while(!collide(arena, player)) { player.pos.y++; }
+    player.pos.y--;
+    playerDrop();
+};
+
+document.getElementById('start-btn').onclick = () => {
+    if (!gameRunning) {
+        gameRunning = true;
+        playerReset();
+        updateScore();
+        update();
+        startTimer();
+        document.getElementById('start-btn').innerText = "PAUSAR";
+    } else {
+        gameRunning = false;
+        document.getElementById('start-btn').innerText = "REANUDAR";
+    }
+};
+
+// Inicializar Arena vacía
+draw();
+</script>
+
+</body>
+</html>
